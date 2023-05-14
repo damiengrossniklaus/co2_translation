@@ -3,7 +3,6 @@ import asyncio
 import colorsys
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
 from typing import Dict, Set, List
 from streamlit_plotly_events import plotly_events
@@ -20,7 +19,7 @@ def init_connection():
 
 
 @st.cache_data(ttl=60)
-def get_product_data(query):
+def get_data_from_db(query):
     return pd.read_sql_query(query, conn)
 
 
@@ -225,9 +224,21 @@ assign_weather_background(weather_condition=weather)  # type: ignore
 init_session_state()
 
 conn = init_connection()
+
 # Get data
-product_data_df = get_product_data("""SELECT * FROM product_data WHERE emission != 0;""")
-st.dataframe(product_data_df)
+product_data_df = get_data_from_db("""SELECT * FROM product_data WHERE emission != 0;""")
+product_filter_df = product_data_df.copy()
+
+weather_data_df = get_data_from_db("""SELECT * FROM v_weather_data;""")
+hydro_data_df = get_data_from_db("""SELECT * FROM hydro_data 
+                                    WHERE local_date_time = (SELECT MAX(local_date_time) FROM hydro_data);""")
+
+weather_data_df = pd.DataFrame(weather_data_df.tail(1))
+
+# st.dataframe(hydro_data_df)
+# st.dataframe(weather_data_df)
+# st.dataframe(product_data_df)
+# top section
 
 st.markdown("# 💨 🌍 Contextualizing CO₂-Emissions")
 
@@ -301,6 +312,7 @@ if product_choice:
                                        (product_data_df['price'] == float(
                                            product_choice.replace("CHF ", "").split(" - ")[2]))].iloc[0, :]
     st.markdown(f"### 📝 {selected_product['name']}")
+    st.markdown("Please find below more detailed information about the product you selected.")
     st.markdown(f"Category: {selected_product['category']}")
 
     col3, col4 = st.columns(2)
@@ -309,12 +321,56 @@ if product_choice:
 
     col5, col6 = st.columns(2)
     col5.metric("⚖️ Weight:", f"{selected_product['weight_gram'] / 1000} Kg")
-    # Make sure emission is displayed in kg
-    col6.metric("💨 Emission:", f"{selected_product['emission']} Kg/CO₂")
+
+    # Get delta emission of category to product
+    cat = str(selected_product.loc['category'])
+    cat_df = product_filter_df[product_filter_df['category'] == cat]
+    avg_emission = cat_df['emission'].mean()
+    delta_emission_pct = round(((selected_product['emission'] / avg_emission - 1) * 100), 1)
+    high_or_low_text = "higher" if delta_emission_pct > 0 else "lower"
+    delta_text = f"""{delta_emission_pct}% {high_or_low_text} to avg. in category"""
+
+    col6.metric("💨 Emission:", f"{selected_product['emission']} Kg/CO₂",
+                delta=delta_text,
+                delta_color='inverse')
 
     emission: float = float(selected_product['emission'])
 
 st.markdown("---")
+
+# Weather section
+st.markdown("### 🌤️ 💧 Weather and Aare information")
+st.markdown("Here is the current weather for Bern as well as the current Aare information.")
+
+st.markdown("#### 🌦️ Current Weather in Bern")
+
+col7, col8 = st.columns(2)
+
+col7.metric("🌡️ Temperature:",
+            f"{weather_data_df['TTT_C'].iloc[0]} °C")
+
+col8.metric("☀️⌛ Sun hours",
+            f"{round(weather_data_df['SUN_MIN'].iloc[0]/60, 2)} hours")
+
+
+st.markdown("#### 🌊 Aare water temperature and flow")
+
+col9, col10 = st.columns(2)
+
+col9.metric("🌡️ Temperature:",
+            f"{hydro_data_df['aare_temp'].iloc[0]} °C")
+
+col10.metric("🌊 Water flow",
+            f"{hydro_data_df['aare_flow'].iloc[0]} m3/s")
+
+
+st.markdown("---")
+
+# Time for compensation method
+
+st.markdown("### ♻️⌛ How long does it take to compensate/offset for the emission?")
+st.markdown("Click the button below to get a comparison between how long it would"
+            " take for a compensation method to offset the emission of your product.")
 
 button = st.button("See time needed per compensation method")
 
@@ -322,6 +378,38 @@ if button:
     col5, col6 = st.columns(2)
     col7, col8 = st.columns(2)
     asyncio.run(async_main())
+
+
+st.markdown("---")
+
+# Compensation/offset method choice
+
+st.markdown("### 🌳☀️🌊 How would you like to compensate for your product?")
+
+chosen_method = st.selectbox("Choose the compensation method:",
+                             ['Choose here', 'Trees', 'Solar', 'Hydro'])
+
+if chosen_method == 'Trees':
+    st.success("### 🌳 Plant Trees in Bern\n Here comes information about the compensation")
+
+elif chosen_method == 'Solar':
+    st.success("### ☀️ Fund a Solar Panel in Bern\n Here comes information about the compensation")
+
+elif chosen_method == 'Hydro':
+    st.success("### 🌊 Fund Hydro Power in Bern\n Here comes information about the compensation")
+
+else:
+    st.info("Please choose a compensation method")
+
+
+if chosen_method in ['Trees', 'Solar', 'Hydro']:
+    compensate_button = st.button(f"Yes, I want to compensate with the {chosen_method} option")
+
+    if compensate_button:
+        st.balloons()
+        st.success("♻️ Thank you for choosing a compensation method to offset "
+                   "the emissions of your product. By doing so, you are helping to make the "
+                   "world a better place. We appreciate your efforts to reduce your carbon footprint!")
 
 if __name__ == "__main__":
     pass
