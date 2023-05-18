@@ -64,12 +64,15 @@ def build_product_data_fig(df: pd.DataFrame, color_list: List[str]) -> go.Figure
                              customdata=list(zip(df['name'], df['price'], df['category'], df['detailed_category']))
                              ))
 
+    title = f'💨⚖️ Emission vs Weight of products <br> ' \
+            f'(categories separated by color and price displayed as size of circle)'
+
     fig.update_layout(
-        title="Emission vs Weight of products (color indicate different category)",
+        title=title,
         xaxis_title="Emission",
         yaxis_title="Weight (gram)",
-        template='plotly_dark'
-    )
+        template='plotly_dark',
+        title_x=0.1)
 
     return fig
 
