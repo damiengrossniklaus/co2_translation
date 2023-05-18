@@ -1,12 +1,12 @@
 import psycopg2
 import asyncio
-import colorsys
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
 from typing import Dict, Set, List
+from PIL import Image
 from streamlit_plotly_events import plotly_events
-from design_functions.design_functions import style_columns, assign_weather_background
+from utils.design_functions import style_columns, assign_weather_background
+from utils.plot_functions import create_color_list, build_product_data_fig, build_product_comparison_fig
 
 # --- Layout ----
 style_columns()
@@ -65,75 +65,6 @@ def update_state(current_query: Dict[str, Set]):
 
     if rerun:
         st.experimental_rerun()
-
-
-def create_color_list(df: pd.DataFrame) -> List[str]:
-    """
-    Creates RGBA values for every unique category in pd.DataFrame.
-    Every category has two RGBA values where alpha corresponds to
-    selected=True --> alpha=0.8 and selected=False --> alpha=0.2
-    """
-    num_categories = df['category'].nunique()
-    color_map = []
-
-    for i in range(num_categories):
-        hue = i / num_categories
-        rgb = tuple(round(i * 255) for i in colorsys.hsv_to_rgb(hue, 0.7, 0.9))
-        color_map.append(rgb)
-
-    unique_categories = df['category'].unique()
-    category_color_map = {}
-
-    for i, category in enumerate(unique_categories):
-        category_color_map[category] = color_map[i % len(color_map)]
-
-    color_list = []
-
-    for category, selected in df[['category', 'selected']].values:
-        if selected:
-            opacity = 0.8
-        else:
-            opacity = 0.2
-        color = category_color_map[category]
-        rgba = f"rgba({color[0]}, {color[1]}, {color[2]}, {opacity})"
-        color_list.append(rgba)
-
-    return color_list
-
-
-def build_product_data_fig(df: pd.DataFrame, color_list: List[str]) -> go.Figure:
-    """
-    Creates go.Scatter figure of product data.
-    """
-
-    fig = go.Figure()
-
-    fig.add_trace(go.Scatter(mode='markers',
-                             x=df['emission'],
-                             y=df['weight_gram'],
-                             marker=dict(
-                                 color=color_list,
-                                 size=df['price'] / 35,
-                                 sizemode='diameter',
-                                 sizemin=7
-                             ),
-                             hovertemplate='<b>%{customdata[0]}</b>'
-                                           '<br>Category: %{customdata[2]}'
-                                           '<br>Price: CHF %{customdata[1]:,.2f}'
-                                           '<br>Weight: %{y:,} gram'
-                                           '<br>Emission: %{x}'
-                                           '<extra></extra>',
-                             customdata=list(zip(df['name'], df['price'], df['category']))
-                             ))
-
-    fig.update_layout(
-        title="Emission vs Weight of products (color indicate different category)",
-        xaxis_title="Emission",
-        yaxis_title="Weight (gram)",
-        template='plotly_dark'
-    )
-
-    return fig
 
 
 # --- Time bars / Async functions ---
@@ -212,15 +143,7 @@ async def async_main():
         st.warning("Please select a product!")
 
 
-# --- Sidebar ---
-# Temporary to display
-weather = st.sidebar.selectbox("Choose weather to display",
-                               ['sun', 'covered', 'rain', 'snow'])
-assign_weather_background(weather_condition=weather)  # type: ignore
-
-
-# ---- App ----
-
+##### INITIALIZE AND GET DATA #####
 init_session_state()
 
 conn = init_connection()
@@ -229,16 +152,33 @@ conn = init_connection()
 product_data_df = get_data_from_db("""SELECT * FROM product_data WHERE emission != 0;""")
 product_filter_df = product_data_df.copy()
 
-weather_data_df = get_data_from_db("""SELECT * FROM v_weather_data;""")
-hydro_data_df = get_data_from_db("""SELECT * FROM hydro_data 
-                                    WHERE local_date_time = (SELECT MAX(local_date_time) FROM hydro_data);""")
+weather_data_df = get_data_from_db("""SELECT * FROM current_weather_data;""")
+hydro_data_df = get_data_from_db("""SELECT * FROM current_hydro_data ;""")
 
-weather_data_df = pd.DataFrame(weather_data_df.tail(1))
 
-# st.dataframe(hydro_data_df)
-# st.dataframe(weather_data_df)
-# st.dataframe(product_data_df)
-# top section
+##### SIDEBAR #####
+
+auto_background = st.sidebar.checkbox("Automatically change background based on current weather",
+                                      value=True)
+if auto_background:
+    current_weather = weather_data_df['condition'].iloc[0]
+    assign_weather_background(weather_condition=current_weather)
+
+else:
+    checkbox = st.sidebar.checkbox("Apply weather background",
+                                   value=True)
+
+    if checkbox:
+        # Temporary to display
+        weather = st.sidebar.selectbox("Choose weather to display",
+                                       ['sun', 'covered', 'rain', 'snow'])
+        assign_weather_background(weather_condition=weather)
+
+
+
+##### APP #####
+
+##### Lead section #####
 
 st.markdown("# 💨 🌍 Contextualizing CO₂-Emissions")
 
@@ -261,7 +201,9 @@ col4.metric("💨 Highest emission of product:",
 
 st.markdown("---")
 
-# Filter categories
+
+
+##### Filter categories #####
 
 st.markdown("### 🔬 Filter Product")
 st.markdown("Filter for the product you would like to inspect more closely. "
@@ -276,12 +218,11 @@ if category_filter:
     sorted_categories.insert(0, "All categories")
 
     selected_categories: List[str] = st.multiselect("Select the categories you are interested in",
-                                         sorted_categories,
-                                         default="All categories")
+                                                    sorted_categories,
+                                                    default="All categories")
 
     if "All categories" not in selected_categories:
         product_data_df = product_data_df[product_data_df['category'].isin(selected_categories)]
-
 
 product_data_df = query_data(product_data_df)
 
@@ -300,18 +241,21 @@ update_state(current_query)
 product_data_df = product_data_df[product_data_df['selected'] == True]
 product_data_df['price_str'] = product_data_df['price'].apply(lambda x: f"CHF {str(x)}0")
 product_zip = list(zip(product_data_df['name'], product_data_df['category'], product_data_df['price_str']))
-choices = [" - ".join(product) for product in product_zip]
+choices = sorted([" - ".join(product) for product in product_zip])
 
 product_choice = st.selectbox("Choose product", choices)
 
 st.markdown("---")
 
-# Product metrics
+
+
+##### Product metrics #####
+
 if product_choice:
     selected_product = product_data_df[(product_data_df['name'] == product_choice.split(" - ")[0]) & \
                                        (product_data_df['price'] == float(
                                            product_choice.replace("CHF ", "").split(" - ")[2]))].iloc[0, :]
-    st.markdown(f"### 📝 {selected_product['name']}")
+    st.markdown(f"### 📝 {selected_product['name']} ({selected_product['detailed_category']})")
     st.markdown("Please find below more detailed information about the product you selected.")
     st.markdown(f"Category: {selected_product['category']}")
 
@@ -336,9 +280,16 @@ if product_choice:
 
     emission: float = float(selected_product['emission'])
 
+    emission_comparison_fig = build_product_comparison_fig(selected_product, cat_df)
+
+    st.plotly_chart(emission_comparison_fig)
+
 st.markdown("---")
 
-# Weather section
+
+
+##### Weather section #####
+
 st.markdown("### 🌤️ 💧 Weather and Aare information")
 st.markdown("Here is the current weather for Bern as well as the current Aare information.")
 
@@ -350,8 +301,7 @@ col7.metric("🌡️ Temperature:",
             f"{weather_data_df['TTT_C'].iloc[0]} °C")
 
 col8.metric("☀️⌛ Sun hours",
-            f"{round(weather_data_df['SUN_MIN'].iloc[0]/60, 2)} hours")
-
+            f"{round(weather_data_df['SUN_MIN'].iloc[0] / 60, 2)} hours")
 
 st.markdown("#### 🌊 Aare water temperature and flow")
 
@@ -361,12 +311,13 @@ col9.metric("🌡️ Temperature:",
             f"{hydro_data_df['aare_temp'].iloc[0]} °C")
 
 col10.metric("🌊 Water flow",
-            f"{hydro_data_df['aare_flow'].iloc[0]} m3/s")
-
+             f"{hydro_data_df['aare_flow'].iloc[0]} m3/s")
 
 st.markdown("---")
 
-# Time for compensation method
+
+
+##### Time for compensation method #####
 
 st.markdown("### ♻️⌛ How long does it take to compensate/offset for the emission?")
 st.markdown("Click the button below to get a comparison between how long it would"
@@ -379,10 +330,11 @@ if button:
     col7, col8 = st.columns(2)
     asyncio.run(async_main())
 
-
 st.markdown("---")
 
-# Compensation/offset method choice
+
+
+##### Compensation/offset method choice #####
 
 st.markdown("### 🌳☀️🌊 How would you like to compensate for your product?")
 
@@ -390,17 +342,44 @@ chosen_method = st.selectbox("Choose the compensation method:",
                              ['Choose here', 'Trees', 'Solar', 'Hydro'])
 
 if chosen_method == 'Trees':
-    st.success("### 🌳 Plant Trees in Bern\n Here comes information about the compensation")
+    text = """
+    ### 🌳 Plant Trees in Bern     
+    Joining forces with company XYZ, planting trees in Bern becomes a 
+    powerful solution to combat emissions and tackle climate change. 
+    Together, we can reduce the city's carbon footprint, 
+    create a greener environment, and build a sustainable future for Bern and beyond."""
+    st.success(text)
+    image = Image.open('images/trees.jpg')
+    st.image(image, caption='Plant trees with company XYZ in Bern')
 
 elif chosen_method == 'Solar':
-    st.success("### ☀️ Fund a Solar Panel in Bern\n Here comes information about the compensation")
+    text = """
+    ### ☀️ Fund a Solar Panel in Bern
+    Funding a solar panel in the Canton of Bern offers a sustainable 
+    solution to harness clean energy and reduce reliance on fossil fuels. 
+    By supporting solar initiatives, we can empower the community to embrace 
+    renewable energy, lower carbon emissions, and pave the way for a greener future in the region.
+    """
+    st.success(text)
+    image = Image.open('images/solar.jpg')
+    st.image(image, caption='Fund solar panels in the canton of Bern')
 
 elif chosen_method == 'Hydro':
-    st.success("### 🌊 Fund Hydro Power in Bern\n Here comes information about the compensation")
+    text = """
+        ### 🌊 Fund Hydro Power in Bern (Mühleberg)
+        Bern is harnessing the power of water through hydro compensation, 
+        a sustainable solution to offset carbon emissions. 
+        By supporting hydro power projects, we can tap into the region's natural resources, 
+        generate clean electricity, and contribute to a greener future. 
+        Join us in supporting hydro compensation initiatives to create a more sustainable 
+        and resilient energy landscape in Bern.
+        """
+    st.success(text)
+    image = Image.open('images/hydro.jpeg')
+    st.image(image, caption='Support the generation of hydro power in Mühleberg')
 
 else:
     st.info("Please choose a compensation method")
-
 
 if chosen_method in ['Trees', 'Solar', 'Hydro']:
     compensate_button = st.button(f"Yes, I want to compensate with the {chosen_method} option")
