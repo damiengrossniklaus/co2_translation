@@ -6,6 +6,7 @@ from typing import Dict, Set, List
 from PIL import Image
 from streamlit_plotly_events import plotly_events
 from utils.design_functions import style_columns, assign_weather_background
+from utils.calc_co2_offset_functions import calc_solar_energy_offset, calc_trees_offset, calc_hydro_offset
 from utils.plot_functions import create_color_list, build_product_data_fig, build_product_comparison_fig
 
 # --- Layout ----
@@ -95,12 +96,13 @@ async def time_passed(max_t: float, time_waiting: float):
             st.markdown(f"##### **{int(months)} months {days} days**")
 
 
-async def compensation_bar(t_compensation: float, time_waiting: float, title: str, column):
+async def compensation_bar(t_compensation: float, time_waiting: float, title: str,
+                           column, help_string: str):
     months = round(t_compensation // 30)
     days = round(t_compensation % 30)
     t = 0
 
-    column.markdown(title)  # type: ignore
+    column.markdown(title, help=help_string)  # type: ignore
     column.markdown(f"{months} months {days} days")  # type: ignore
     progress_bar = column.progress(0)  # type: ignore
 
@@ -116,28 +118,36 @@ async def compensation_bar(t_compensation: float, time_waiting: float, title: st
         progress_bar.progress(percent_complete, text=f"{percent_complete} %")
 
 
-async def async_main():
-    # max compensation amount in days
-    # Trees assumption: 22kg per year --> day = 0.0602 kg --> 10 trees 0.602
-    TREE_COMPENSATION = 0.602
-    HYDRO_COMPENSATION = 0.7
-    SOLAR_COMPENSATION = 1.5
+async def async_main(sun_hours: float, num_trees: int, water_flow: float):
+    tree_compensation = calc_trees_offset(num_trees)
+    hydro_compensation = calc_hydro_offset(water_flow)
+    solar_compensation = calc_solar_energy_offset(sun_hours)
+
+    tree_info = "tree"
+    hydro_info = "hydro"
+    solar_info = "solar"
 
     if emission:
-        t_tree = emission / TREE_COMPENSATION
-        t_hydro = emission / HYDRO_COMPENSATION
-        t_solar = emission / SOLAR_COMPENSATION
+        t_tree = emission / tree_compensation
+        t_hydro = emission / hydro_compensation
+        t_solar = emission / solar_compensation
         max_t = max(t_tree, t_hydro, t_solar)
 
         if max_t <= 720:
             time_waiting = 0.2
         else:
-            time_waiting = max_t / (max_t ** 1.6)
+            time_waiting = max_t / (max_t ** 1.7)
 
         await asyncio.gather(time_passed(max_t, time_waiting),
-                             compensation_bar(t_tree, time_waiting, "#### 🌳 10 Trees", col6),
-                             compensation_bar(t_solar, time_waiting, "#### ☀️ One Solar Panel (1.767 x 1.041)", col7),
-                             compensation_bar(t_hydro, time_waiting, "#### 🌊 Hydro", col8))
+                             compensation_bar(t_tree, time_waiting, "#### 🌳 One Trees", col6, tree_info),
+                             compensation_bar(t_solar, time_waiting, "#### ☀️ One Solar Panel (1.767 x 1.041)",
+                                              col7, solar_info),
+                             compensation_bar(t_hydro, time_waiting, "#### 🌊 Hydro", col8, hydro_info))
+
+        stop_flag = st.session_state.get("stop_flag", False)
+
+        if stop_flag:
+            st.stop()
 
     else:
         st.warning("Please select a product!")
@@ -181,6 +191,15 @@ else:
 ##### Lead section #####
 
 st.markdown("# 💨 🌍 Contextualizing CO₂-Emissions")
+
+# Read lead text
+lead_text_path = 'assets/lead_text.md'
+lead_text = ""
+with open(lead_text_path, 'r') as f:
+    for line in f.readlines():
+        lead_text += line
+
+st.markdown(lead_text)
 
 # Total product metrics
 col1, col2 = st.columns(2)
@@ -300,8 +319,9 @@ col7, col8 = st.columns(2)
 col7.metric("🌡️ Temperature:",
             f"{weather_data_df['TTT_C'].iloc[0]} °C")
 
+sun_hours_today = round(weather_data_df['SUN_MIN'].iloc[0] / 60, 2)
 col8.metric("☀️⌛ Sun hours",
-            f"{round(weather_data_df['SUN_MIN'].iloc[0] / 60, 2)} hours")
+            f"{sun_hours_today} hours")
 
 st.markdown("#### 🌊 Aare water temperature and flow")
 
@@ -310,8 +330,9 @@ col9, col10 = st.columns(2)
 col9.metric("🌡️ Temperature:",
             f"{hydro_data_df['aare_temp'].iloc[0]} °C")
 
+current_water_flow = hydro_data_df['aare_flow'].iloc[0]
 col10.metric("🌊 Water flow",
-             f"{hydro_data_df['aare_flow'].iloc[0]} m3/s")
+             f"{current_water_flow} m3/s")
 
 st.markdown("---")
 
@@ -326,15 +347,26 @@ st.markdown("Click the button below to get a comparison between how long it woul
 button = st.button("See time needed per compensation method")
 
 if button:
+    stop_button = st.button("Stop time comparison", key="stop_button")
+    if stop_button:
+        st.stop()
     col5, col6 = st.columns(2)
     col7, col8 = st.columns(2)
-    asyncio.run(async_main())
+    # st.write(calc_solar_energy_offset(sun_hours_today))
+    # st.write(calc_trees_offset(1))
+    # st.write(calc_hydro_offset(current_water_flow))
+
+    asyncio.run(async_main(sun_hours=sun_hours_today,
+                           num_trees=1,
+                           water_flow=current_water_flow))
+
 
 st.markdown("---")
 
 
 
 ##### Compensation/offset method choice #####
+
 
 st.markdown("### 🌳☀️🌊 How would you like to compensate for your product?")
 
@@ -343,18 +375,19 @@ chosen_method = st.selectbox("Choose the compensation method:",
 
 if chosen_method == 'Trees':
     text = """
-    ### 🌳 Plant Trees in Bern     
+    ### 🌳 Plant Trees in Bern - CHF XY.-    
     Joining forces with company XYZ, planting trees in Bern becomes a 
     powerful solution to combat emissions and tackle climate change. 
     Together, we can reduce the city's carbon footprint, 
-    create a greener environment, and build a sustainable future for Bern and beyond."""
+    create a greener environment, and build a sustainable future for Bern and beyond.
+    """
     st.success(text)
     image = Image.open('images/trees.jpg')
     st.image(image, caption='Plant trees with company XYZ in Bern')
 
 elif chosen_method == 'Solar':
     text = """
-    ### ☀️ Fund a Solar Panel in Bern
+    ### ☀️ Fund a Solar Panel in Bern - CHF XY.- 
     Funding a solar panel in the Canton of Bern offers a sustainable 
     solution to harness clean energy and reduce reliance on fossil fuels. 
     By supporting solar initiatives, we can empower the community to embrace 
@@ -366,7 +399,7 @@ elif chosen_method == 'Solar':
 
 elif chosen_method == 'Hydro':
     text = """
-        ### 🌊 Fund Hydro Power in Bern (Mühleberg)
+        ### 🌊 Fund Hydro Power in Bern (Mühleberg) - CHF XY.- 
         Bern is harnessing the power of water through hydro compensation, 
         a sustainable solution to offset carbon emissions. 
         By supporting hydro power projects, we can tap into the region's natural resources, 
@@ -389,6 +422,7 @@ if chosen_method in ['Trees', 'Solar', 'Hydro']:
         st.success("♻️ Thank you for choosing a compensation method to offset "
                    "the emissions of your product. By doing so, you are helping to make the "
                    "world a better place. We appreciate your efforts to reduce your carbon footprint!")
+
 
 if __name__ == "__main__":
     pass
