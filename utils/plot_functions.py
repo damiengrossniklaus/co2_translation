@@ -2,9 +2,43 @@ import colorsys
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
-from typing import List
+from typing import List, Tuple
 
-def create_color_list(df: pd.DataFrame) -> List[str]:
+# def create_color_list(df: pd.DataFrame) -> List[str]:
+#     """
+#     Creates RGBA values for every unique category in pd.DataFrame.
+#     Every category has two RGBA values where alpha corresponds to
+#     selected=True --> alpha=0.8 and selected=False --> alpha=0.2
+#     """
+#     num_categories = df['category'].nunique()
+#     color_map = []
+#
+#     for i in range(num_categories):
+#         hue = i / num_categories
+#         rgb = tuple(round(i * 255) for i in colorsys.hsv_to_rgb(hue, 0.7, 0.9))
+#         color_map.append(rgb)
+#
+#     unique_categories = df['category'].unique()
+#     category_color_map = {}
+#
+#     for i, category in enumerate(unique_categories):
+#         category_color_map[category] = color_map[i % len(color_map)]
+#
+#     color_list = []
+#
+#     for category, selected in df[['category', 'selected']].values:
+#         if selected:
+#             opacity = 0.8
+#         else:
+#             opacity = 0.2
+#         color = category_color_map[category]
+#         rgba = f"rgba({color[0]}, {color[1]}, {color[2]}, {opacity})"
+#         color_list.append(rgba)
+#
+#     return color_list
+
+
+def create_color_list(df: pd.DataFrame):
     """
     Creates RGBA values for every unique category in pd.DataFrame.
     Every category has two RGBA values where alpha corresponds to
@@ -25,6 +59,7 @@ def create_color_list(df: pd.DataFrame) -> List[str]:
         category_color_map[category] = color_map[i % len(color_map)]
 
     color_list = []
+    category_color_list = []
 
     for category, selected in df[['category', 'selected']].values:
         if selected:
@@ -34,8 +69,9 @@ def create_color_list(df: pd.DataFrame) -> List[str]:
         color = category_color_map[category]
         rgba = f"rgba({color[0]}, {color[1]}, {color[2]}, {opacity})"
         color_list.append(rgba)
+        category_color_list.append((category, rgba))
 
-    return color_list
+    return color_list, category_color_list
 
 
 def build_product_data_fig(df: pd.DataFrame, color_list: List[str]) -> go.Figure:
@@ -75,6 +111,36 @@ def build_product_data_fig(df: pd.DataFrame, color_list: List[str]) -> go.Figure
         title_x=0.1)
 
     return fig
+
+
+def create_color_legend(color_cat_map_list):
+    """
+    Create color legend for color category map
+    """
+    unique_categories = set()
+    legend_html = "<h5>Category Color Legend</h5>"
+
+    color_counter = 0
+    for category, color in color_cat_map_list:
+        if category not in unique_categories:
+            if color_counter % 4 == 0:
+                legend_html += "<div style='display: flex;'>"
+            legend_html += "<div style='flex: 1;'>"
+            legend_html += f"<div style='display: flex; align-items: center; margin-bottom: 10px;'>"
+            legend_html += f"<span style='background-color: {color}; width: 20px; height: 20px; margin-right: 5px;'></span>"
+            legend_html += f"<span>{category}</span>"
+            legend_html += "</div>"
+            legend_html += "</div>"
+            if color_counter % 4 == 3:
+                legend_html += "</div>"
+            unique_categories.add(category)
+            color_counter += 1
+
+    # Check if the loop ended with an open <div> tag
+    if color_counter % 4 != 0:
+        legend_html += "</div>"
+
+    return legend_html
 
 
 def build_product_comparison_fig(selected_product_series: pd.Series, category_df: pd.DataFrame):

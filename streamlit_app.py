@@ -6,9 +6,9 @@ from typing import Dict, Set, List
 from PIL import Image
 from streamlit_plotly_events import plotly_events
 from utils.design_functions import style_columns, assign_weather_background
+from utils.helper_functions import read_markdown
 from utils.calc_co2_offset_functions import calc_solar_energy_offset, calc_trees_offset, calc_hydro_offset
-from utils.plot_functions import create_color_list, build_product_data_fig, build_product_comparison_fig
-
+from utils.plot_functions import create_color_list, build_product_data_fig, build_product_comparison_fig, create_color_legend
 # --- Layout ----
 style_columns()
 
@@ -123,9 +123,9 @@ async def async_main(sun_hours: float, num_trees: int, water_flow: float):
     hydro_compensation = calc_hydro_offset(water_flow)
     solar_compensation = calc_solar_energy_offset(sun_hours)
 
-    tree_info = "tree"
-    hydro_info = "hydro"
-    solar_info = "solar"
+    tree_info = read_markdown('assets/tree_calc_info.md')
+    hydro_info = read_markdown('assets/hydro_calc_info.md')
+    solar_info = read_markdown('assets/solar_calc_info.md')
 
     if emission:
         t_tree = emission / tree_compensation
@@ -140,9 +140,11 @@ async def async_main(sun_hours: float, num_trees: int, water_flow: float):
 
         await asyncio.gather(time_passed(max_t, time_waiting),
                              compensation_bar(t_tree, time_waiting, "#### 🌳 One Trees", col6, tree_info),
-                             compensation_bar(t_solar, time_waiting, "#### ☀️ One Solar Panel (1.767 x 1.041)",
+                             compensation_bar(t_solar, time_waiting, "#### ☀️ One Solar Panel (1.767 m x 1.041 m)",
                                               col7, solar_info),
-                             compensation_bar(t_hydro, time_waiting, "#### 🌊 Hydro", col8, hydro_info))
+                             compensation_bar(t_hydro, time_waiting,
+                                              "#### 🌊 Water wheel Aare (2m x 1m)",
+                                              col8, hydro_info))
 
         stop_flag = st.session_state.get("stop_flag", False)
 
@@ -193,11 +195,7 @@ else:
 st.markdown("# 💨 🌍 Contextualizing CO₂-Emissions")
 
 # Read lead text
-lead_text_path = 'assets/lead_text.md'
-lead_text = ""
-with open(lead_text_path, 'r') as f:
-    for line in f.readlines():
-        lead_text += line
+lead_text = read_markdown('assets/lead_text.md')
 
 st.markdown(lead_text)
 
@@ -245,8 +243,13 @@ if category_filter:
 
 product_data_df = query_data(product_data_df)
 
-category_color_list = create_color_list(product_data_df)
+category_color_list, category_color_legend_list = create_color_list(product_data_df)
 product_fig = build_product_data_fig(product_data_df, category_color_list)
+
+legend_html = create_color_legend(category_color_legend_list)
+
+# Render the legend in Streamlit
+st.markdown(legend_html, unsafe_allow_html=True)
 
 selected_points = plotly_events(product_fig,
                                 select_event=True,
@@ -341,8 +344,9 @@ st.markdown("---")
 ##### Time for compensation method #####
 
 st.markdown("### ♻️⌛ How long does it take to compensate/offset for the emission?")
-st.markdown("Click the button below to get a comparison between how long it would"
-            " take for a compensation method to offset the emission of your product.")
+
+time_comp_lead_text = read_markdown('assets/offset_comparison_lead.md')
+st.markdown(time_comp_lead_text)
 
 button = st.button("See time needed per compensation method")
 
@@ -352,9 +356,6 @@ if button:
         st.stop()
     col5, col6 = st.columns(2)
     col7, col8 = st.columns(2)
-    # st.write(calc_solar_energy_offset(sun_hours_today))
-    # st.write(calc_trees_offset(1))
-    # st.write(calc_hydro_offset(current_water_flow))
 
     asyncio.run(async_main(sun_hours=sun_hours_today,
                            num_trees=1,
