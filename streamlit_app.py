@@ -8,7 +8,8 @@ from streamlit_plotly_events import plotly_events
 from utils.design_functions import style_columns, assign_weather_background
 from utils.helper_functions import read_markdown
 from utils.calc_co2_offset_functions import calc_solar_energy_offset, calc_trees_offset, calc_hydro_offset
-from utils.plot_functions import create_color_list, build_product_data_fig, build_product_comparison_fig, create_color_legend
+from utils.plot_functions import create_color_list, build_product_data_fig, build_product_comparison_fig, \
+    create_color_legend
 # --- Layout ----
 style_columns()
 

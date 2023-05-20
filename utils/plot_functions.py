@@ -4,39 +4,6 @@ import plotly.graph_objects as go
 import plotly.express as px
 from typing import List, Tuple
 
-# def create_color_list(df: pd.DataFrame) -> List[str]:
-#     """
-#     Creates RGBA values for every unique category in pd.DataFrame.
-#     Every category has two RGBA values where alpha corresponds to
-#     selected=True --> alpha=0.8 and selected=False --> alpha=0.2
-#     """
-#     num_categories = df['category'].nunique()
-#     color_map = []
-#
-#     for i in range(num_categories):
-#         hue = i / num_categories
-#         rgb = tuple(round(i * 255) for i in colorsys.hsv_to_rgb(hue, 0.7, 0.9))
-#         color_map.append(rgb)
-#
-#     unique_categories = df['category'].unique()
-#     category_color_map = {}
-#
-#     for i, category in enumerate(unique_categories):
-#         category_color_map[category] = color_map[i % len(color_map)]
-#
-#     color_list = []
-#
-#     for category, selected in df[['category', 'selected']].values:
-#         if selected:
-#             opacity = 0.8
-#         else:
-#             opacity = 0.2
-#         color = category_color_map[category]
-#         rgba = f"rgba({color[0]}, {color[1]}, {color[2]}, {opacity})"
-#         color_list.append(rgba)
-#
-#     return color_list
-
 
 def create_color_list(df: pd.DataFrame):
     """
