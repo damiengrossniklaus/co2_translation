@@ -163,10 +163,15 @@ conn = init_connection()
 
 # Get data
 product_data_df = get_data_from_db("""SELECT * FROM product_data WHERE emission != 0;""")
-product_filter_df = product_data_df.copy()
-
-weather_data_df = get_data_from_db("""SELECT * FROM current_weather_data;""")
+weather_data_df = get_data_from_db("""SELECT * FROM current_weather;""")
+sun_hours = get_data_from_db("""SELECT * FROM sun_hours""")
 hydro_data_df = get_data_from_db("""SELECT * FROM current_hydro_data ;""")
+
+# Cleaning - Remove symbols in name that might disrupt filtering dropdown section
+product_data_df['name'] = product_data_df['name'].apply(lambda x: x.replace("-", "").replace("/", "").replace("\\", ""))
+
+# Create copy of data frame to also filter for category of product
+product_filter_df = product_data_df.copy()
 
 
 ##### SIDEBAR #####
@@ -323,7 +328,7 @@ col7, col8 = st.columns(2)
 col7.metric("🌡️ Temperature:",
             f"{weather_data_df['TTT_C'].iloc[0]} °C")
 
-sun_hours_today = round(weather_data_df['SUN_MIN'].iloc[0] / 60, 2)
+sun_hours_today = round(sun_hours['sum'].iloc[0] / 60, 2)
 col8.metric("☀️⌛ Sun hours",
             f"{sun_hours_today} hours")
 
