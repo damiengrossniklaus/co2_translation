@@ -117,7 +117,7 @@ def build_product_comparison_fig(selected_product_series: pd.Series, category_df
     """
 
     category = category_df[category_level].iloc[0]
-    title = f'💨🎨 Emission Comparison of your product in {category}'
+    title = f'💨🎨 Emission Comparison of your product within category {category}'
 
     # Create category dataframe
     selected_product_df = pd.DataFrame(selected_product_series).transpose()
