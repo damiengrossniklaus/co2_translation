@@ -36,8 +36,8 @@ The calculation is based on the following fictitious **water wheel**:
 ### :information_source: Sources:
 
 * [Hydro power energy production](https://en.wikipedia.org/wiki/Water_wheel)
-* [Aare informaiton](https://swissflies.ch/aare.php?l=de#:~:text=Die%20Aare%20entspringt%20in%20der,Breite%20von%2030%2D50%20m.)
+* [Aare information](https://swissflies.ch/aare.php?l=de#:~:text=Die%20Aare%20entspringt%20in%20der,Breite%20von%2030%2D50%20m.)
 * [Swiss Energy Consumption and CO₂ emission from energy](https://www.bp.com/en/global/corporate/energy-economics/statistical-review-of-world-energy/downloads.html)
 
-*(Note that these calculation are an approximation and that real values can deviate)*
+*(Note that these calculations are an approximation and that real values can deviate)*
 
