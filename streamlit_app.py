@@ -334,7 +334,7 @@ if product_choice:
 
     emission: float = float(selected_product['emission'])
 
-    emission_comparison_fig = build_product_comparison_fig(selected_product, cat_df)
+    emission_comparison_fig = build_product_comparison_fig(selected_product, cat_df, category_level=aggregation)
 
     st.plotly_chart(emission_comparison_fig)
 
