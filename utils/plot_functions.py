@@ -62,7 +62,7 @@ def build_product_data_fig(df: pd.DataFrame, color_list: List[str], level: str =
                                            '<br>Sub-category: %{customdata[3]}'
                                            '<br>Price: CHF %{customdata[1]:,.2f}'
                                            '<br>Weight: %{y:,} gram'
-                                           '<br>Emission: %{x}'
+                                           '<br>Emission: %{x} Kg/CO₂'
                                            '<extra></extra>',
                              customdata=list(zip(df['name'], df['price'], df['category'], df['detailed_category']))
                              ))
@@ -72,7 +72,7 @@ def build_product_data_fig(df: pd.DataFrame, color_list: List[str], level: str =
 
     fig.update_layout(
         title=title,
-        xaxis_title="Emission",
+        xaxis_title="Emission in Kg/CO₂",
         yaxis_title="Weight (gram)",
         template='plotly_dark',
         title_x=0.1)
