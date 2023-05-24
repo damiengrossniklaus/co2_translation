@@ -5,13 +5,13 @@ import plotly.express as px
 from typing import List, Tuple
 
 
-def create_color_list(df: pd.DataFrame):
+def create_color_list(df: pd.DataFrame, category_level: str = 'category'):
     """
-    Creates RGBA values for every unique category in pd.DataFrame.
+    Creates RGBA values for every unique category-level in pd.DataFrame.
     Every category has two RGBA values where alpha corresponds to
     selected=True --> alpha=0.8 and selected=False --> alpha=0.2
     """
-    num_categories = df['category'].nunique()
+    num_categories = df[category_level].nunique()
     color_map = []
 
     for i in range(num_categories):
@@ -19,7 +19,7 @@ def create_color_list(df: pd.DataFrame):
         rgb = tuple(round(i * 255) for i in colorsys.hsv_to_rgb(hue, 0.7, 0.9))
         color_map.append(rgb)
 
-    unique_categories = df['category'].unique()
+    unique_categories = df[category_level].unique()
     category_color_map = {}
 
     for i, category in enumerate(unique_categories):
@@ -28,7 +28,7 @@ def create_color_list(df: pd.DataFrame):
     color_list = []
     category_color_list = []
 
-    for category, selected in df[['category', 'selected']].values:
+    for category, selected in df[[category_level, 'selected']].values:
         if selected:
             opacity = 0.8
         else:
@@ -41,7 +41,7 @@ def create_color_list(df: pd.DataFrame):
     return color_list, category_color_list
 
 
-def build_product_data_fig(df: pd.DataFrame, color_list: List[str]) -> go.Figure:
+def build_product_data_fig(df: pd.DataFrame, color_list: List[str], level: str = 'Category') -> go.Figure:
     """
     Creates go.Scatter figure of product data.
     """
@@ -68,7 +68,7 @@ def build_product_data_fig(df: pd.DataFrame, color_list: List[str]) -> go.Figure
                              ))
 
     title = f'💨⚖️ Emission vs Weight of products <br> ' \
-            f'(categories separated by color and price displayed as size of circle)'
+            f'({level} separated by color and price displayed as size of circle)'
 
     fig.update_layout(
         title=title,
@@ -80,12 +80,12 @@ def build_product_data_fig(df: pd.DataFrame, color_list: List[str]) -> go.Figure
     return fig
 
 
-def create_color_legend(color_cat_map_list):
+def create_color_legend(color_cat_map_list, level: str = 'Category'):
     """
-    Create color legend for color category map
+    Creates color legend for color category-level map
     """
     unique_categories = set()
-    legend_html = "<h5>Category Color Legend</h5>"
+    legend_html = f"<h5>{level} Color Legend</h5>"
 
     color_counter = 0
     for category, color in color_cat_map_list:
@@ -110,12 +110,13 @@ def create_color_legend(color_cat_map_list):
     return legend_html
 
 
-def build_product_comparison_fig(selected_product_series: pd.Series, category_df: pd.DataFrame):
+def build_product_comparison_fig(selected_product_series: pd.Series, category_df: pd.DataFrame,
+                                 category_level: str = 'category'):
     """
-    Create px.bar figure of selected product compared to other products in category.
+    Create px.bar figure of selected product compared to other products in category_level.
     """
 
-    category = category_df['category'].iloc[0]
+    category = category_df[category_level].iloc[0]
     title = f'💨🎨 Emission Comparison of your product in {category}'
 
     # Create category dataframe
@@ -126,7 +127,7 @@ def build_product_comparison_fig(selected_product_series: pd.Series, category_df
     selected_category_df = pd.concat([selected_product_df, category_df])
 
     # Drop selected product duplicate out of category_df
-    selected_category_df.drop_duplicates(subset=['name', 'price', 'category',
+    selected_category_df.drop_duplicates(subset=['name', 'price', category_level,
                                                  'emission', 'compensation_price',
                                                  'weight_gram'], inplace=True)
 
@@ -168,3 +169,4 @@ def build_product_comparison_fig(selected_product_series: pd.Series, category_df
         title_x=0.1)
 
     return emission_comparison_fig
+

@@ -247,12 +247,31 @@ if category_filter:
     if "All categories" not in selected_categories:
         product_data_df = product_data_df[product_data_df['category'].isin(selected_categories)]
 
+subcategory_filter = st.checkbox("Check to filter for specific subcategories")
+
+if subcategory_filter:
+    sorted_categories = sorted(product_data_df['detailed_category'].unique())
+    sorted_categories.insert(0, "All subcategories")
+
+    selected_subcategories: List[str] = st.multiselect("Select the subcategories you are interested in",
+                                                    sorted_categories,
+                                                    default="All subcategories")
+
+    if "All subcategories" not in selected_subcategories:
+        product_data_df = product_data_df[product_data_df['detailed_category'].isin(selected_subcategories)]
+
 product_data_df = query_data(product_data_df)
 
-category_color_list, category_color_legend_list = create_color_list(product_data_df)
-product_fig = build_product_data_fig(product_data_df, category_color_list)
+if subcategory_filter:
+    category_color_list, category_color_legend_list = create_color_list(product_data_df, 'detailed_category')
+    filter_level = 'Subcategory'
+else:
+    category_color_list, category_color_legend_list = create_color_list(product_data_df, 'category')
+    filter_level = 'Category'
 
-legend_html = create_color_legend(category_color_legend_list)
+product_fig = build_product_data_fig(product_data_df, category_color_list, level=filter_level)
+
+legend_html = create_color_legend(category_color_legend_list, level=filter_level)
 
 # Render the legend in Streamlit
 st.markdown(legend_html, unsafe_allow_html=True)
@@ -294,13 +313,20 @@ if product_choice:
     col5, col6 = st.columns(2)
     col5.metric("⚖️ Weight:", f"{selected_product['weight_gram'] / 1000} Kg")
 
-    # Get delta emission of category to product
-    cat = str(selected_product.loc['category'])
-    cat_df = product_filter_df[product_filter_df['category'] == cat]
+    # Get delta emission of category or subcategory to product
+    if filter_level == 'Subcategory':
+        aggregation = 'detailed_category'
+        filter_cat = 'subcat.'
+    else:
+        aggregation = 'category'
+        filter_cat = 'category'
+
+    cat = str(selected_product.loc[aggregation])
+    cat_df = product_filter_df[product_filter_df[aggregation] == cat]
     avg_emission = cat_df['emission'].mean()
     delta_emission_pct = round(((selected_product['emission'] / avg_emission - 1) * 100), 1)
     high_or_low_text = "higher" if delta_emission_pct > 0 else "lower"
-    delta_text = f"""{delta_emission_pct}% {high_or_low_text} to avg. in category"""
+    delta_text = f"""{delta_emission_pct}% {high_or_low_text} to avg. in {filter_cat}"""
 
     col6.metric("💨 Emission:", f"{selected_product['emission']} Kg/CO₂",
                 delta=delta_text,
