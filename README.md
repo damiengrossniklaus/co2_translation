@@ -63,8 +63,8 @@ cd mobileup_dashboard
       host = "dwl-23.c6drip5o07l1.us-east-1.rds.amazonaws.com"
       port = 5432
       dbname = "dwl_23"
-      user = "postgres"
-      password = "postgres"
+      user = "streamlit"
+      password = "streamlit"
       ``````
 
    3. In order to not commit the `secrets.toml` make sure to create a `.gitignore` file on root directory level. In the there add `.streamlit/`. This will make sure that you do not commit the DB secrets.
