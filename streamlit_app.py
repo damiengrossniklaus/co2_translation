@@ -10,17 +10,18 @@ from utils.helper_functions import read_markdown
 from utils.calc_co2_offset_functions import calc_solar_energy_offset, calc_trees_offset, calc_hydro_offset
 from utils.plot_functions import create_color_list, build_product_data_fig, build_product_comparison_fig, \
     create_color_legend
+
 # --- Layout ----
 style_columns()
 
 
 # --- Data Query ---
-@st.cache_resource
+@st.cache_resource(ttl=3200)
 def init_connection():
     return psycopg2.connect(**st.secrets["postgres"])
 
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=7200)
 def get_data_from_db(query):
     return pd.read_sql_query(query, conn)
 
@@ -165,7 +166,7 @@ conn = init_connection()
 product_data_df = get_data_from_db("""SELECT * FROM product_data WHERE emission != 0;""")
 weather_data_df = get_data_from_db("""SELECT * FROM current_weather;""")
 sun_hours = get_data_from_db("""SELECT * FROM sun_hours""")
-hydro_data_df = get_data_from_db("""SELECT * FROM current_hydro_data ;""")
+hydro_data_df = get_data_from_db("""SELECT * FROM current_hydro_data;""")
 
 # Cleaning - Remove symbols in name that might disrupt filtering dropdown section
 product_data_df['name'] = product_data_df['name'].apply(lambda x: x.replace("-", "").replace("/", "").replace("\\", ""))
