@@ -168,6 +168,15 @@ weather_data_df = get_data_from_db("""SELECT * FROM current_weather;""")
 sun_hours = get_data_from_db("""SELECT * FROM sun_hours""")
 hydro_data_df = get_data_from_db("""SELECT * FROM current_hydro_data;""")
 
+# If weather data does not consist of data for data anymore (not extracted anymore) take max date
+if weather_data_df.empty:
+    weather_data_df = get_data_from_db("""SELECT * FROM last_weather_data;""")
+
+
+# If sun hours data does not consist of data for data anymore (not extracted anymore) take max date data
+if sun_hours['sum'].iloc[0] is None:
+    sun_hours = get_data_from_db("""SELECT * FROM last_sun_hours_data;""")
+
 # Cleaning - Remove symbols in name that might disrupt filtering dropdown section
 product_data_df['name'] = product_data_df['name'].apply(lambda x: x.replace("-", "").replace("/", "").replace("\\", ""))
 
@@ -176,7 +185,6 @@ product_filter_df = product_data_df.copy()
 
 
 ##### SIDEBAR #####
-
 auto_background = st.sidebar.checkbox("Automatically change background based on current weather",
                                       value=True)
 if auto_background:
