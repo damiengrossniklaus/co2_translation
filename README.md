@@ -4,7 +4,6 @@ This project represents the visualization and web app repository for the semeste
 
 ### [ Access to Web App](https://co2-translation.streamlit.app/)
 
-(Note: In case that the app is not working, please contact damien.grossniklaus@gmail.com)
 
 ## Project structure
 
